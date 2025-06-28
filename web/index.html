@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+    <base href="$FLUTTER_BASE_HREF" />
+
+    <meta charset="UTF-8" />
+    <meta content="IE=Edge" http-equiv="X-UA-Compatible" />
+    <meta name="description" content="A new Flutter project." />
+
+    <!-- iOS meta tags & icons -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="apple-mobile-web-app-title" content="tataapps" />
+    <link rel="apple-touch-icon" href="icons/Icon-192.png" />
+
+    <!-- Google Sign In Client ID -->
+    <meta
+      name="google-signin-client_id"
+      content="244660030535-lodn72p8i6c0e8ufni92k9lorfqsrffc.apps.googleusercontent.com"
+    />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="favicon.png" />
+
+    <title>tataapps</title>
+    <link rel="manifest" href="manifest.json" />
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-messaging-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+
+    <!-- Firebase configuration -->
+    <script>
+      const firebaseConfig = {
+        apiKey: "AIzaSyCpgEcZuvQW70JHFbJ2mBHlM_hf8DsPWvQ",
+        authDomain: "printing-commerce.firebaseapp.com",
+        projectId: "printing-commerce",
+        storageBucket: "printing-commerce.firebasestorage.app",
+        messagingSenderId: "244660030535",
+        appId: "1:244660030535:web:3340b70f50c4fbd9843562",
+        databaseURL: "https://printing-commerce-default-rtdb.firebaseio.com",
+      };
+
+      // Initialize Firebase
+      const app = firebase.initializeApp(firebaseConfig);
+
+      // Initialize Firebase Cloud Messaging
+      const messaging = firebase.messaging();
+
+      // Request permission and get token in development mode
+      if (window.location.hostname === "localhost") {
+        console.log("Running in development mode - skipping FCM setup");
+      } else {
+        try {
+          messaging
+            .getToken({
+              vapidKey:
+                "BJ7Nle1g-lfmypL4jngAW-8cDnnyq9JO2HtID_WVviL-lf8HRCQ8leegxkhKqQgLpZ3xa5vZnLoeHB_O4KKg1TI",
+            })
+            .then((token) => {
+              if (token) {
+                console.log("FCM Token:", token);
+              } else {
+                console.log("No FCM token available");
+              }
+            })
+            .catch((err) => {
+              console.log("Error getting FCM token:", err);
+            });
+        } catch (e) {
+          console.log("Error initializing FCM:", e);
+        }
+      }
+    </script>
+
+    <!-- This script adds the flutter initialization JS code -->
+    <script>
+      // The value below is injected by flutter build, do not touch.
+      const serviceWorkerVersion = "{{flutter_service_worker_version}}";
+    </script>
+  </head>
+  <body>
+    <!-- Service worker registration -->
+    <script>
+      // Service worker registration
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", function () {
+          navigator.serviceWorker
+            .register("/firebase-messaging-sw.js")
+            .then(function (registration) {
+              console.log(
+                "Firebase Service Worker registered with scope: ",
+                registration.scope
+              );
+            })
+            .catch(function (error) {
+              console.log(
+                "Firebase Service Worker registration failed: ",
+                error
+              );
+            });
+        });
+      }
+    </script>
+    <script src="flutter_bootstrap.js" async></script>
+  </body>
+</html>

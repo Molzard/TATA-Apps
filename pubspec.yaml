@@ -1,0 +1,107 @@
+name: TATA
+description: "A new Flutter project."
+
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.5.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  flutter_launcher_icons: ^0.14.3
+  flutter_svg: ^2.0.9
+  fluttericon: ^2.0.0
+  flutter_bloc: ^9.1.1
+  flutter_sticky_header: ^0.7.0
+  http: ^1.1.0
+  http_parser: ^4.1.2
+  flutter_otp_text_field: ^1.1.1
+  get: ^4.6.6
+  carousel_slider: ^5.1.1
+  smooth_page_indicator: ^1.1.0
+  url_launcher: ^6.2.5
+  shimmer: ^3.0.0
+  image_picker: ^1.1.2
+  path_provider: ^2.1.1
+  dio: ^5.3.3
+  firebase_messaging: ^15.2.6
+  flutter_local_notifications: ^19.2.1
+  # image_gallery_saver: ^2.0.3
+  screenshot: ^3.0.0
+  flutter_date_pickers: ^0.4.2
+  excel: ^4.0.6
+  animated_splash_screen: ^1.3.0
+  pdf: ^3.10.8
+  printing: ^5.12.0
+  open_file: ^3.3.2
+  loading_animation_widget: ^1.2.1
+  shared_preferences: ^2.5.2
+  email_otp: ^3.0.2
+  firebase_storage: ^12.4.6
+  firebase_core: ^3.13.1
+  firebase_auth: ^5.5.4
+  google_sign_in: ^6.2.2
+  fl_chart: ^0.71.0
+  table_calendar: ^3.0.9
+  permission_handler: ^11.3.1
+  pinput: ^5.0.0
+  lottie: ^3.1.3
+  cloud_firestore: ^5.6.9
+  intl: 0.19.0
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/images/inspirasi_desain/
+    - assets/animations/
+    - assets/fonts/
+
+  fonts:
+    - family: OdorMeanChey
+      fonts:
+        - asset: assets/fonts/OdorMeanChey-Regular.ttf
+    - family: NotoSanCondensed
+      fonts:
+        - asset: assets/fonts/NotoSans_Condensed-Black.ttf
+    - family: NotoSanSemiBold
+      fonts:
+        - asset: assets/fonts/NotoSans-SemiBold.ttf
+    - family: Manjari
+      fonts:
+        - asset: assets/fonts/Manjari-Bold.ttf
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto-Regular.ttf
+    - family: OpenSans
+      fonts:
+        - asset: assets/fonts/OpenSans-Italic.ttf
+        - asset: assets/fonts/OpenSans-VariableFont_wdth,wght.ttf
+
+    - family: Arvo
+      fonts:
+        - asset: assets/fonts/Arvo-Regular.ttf
+        - asset: assets/fonts/Arvo-Bold.ttf
+        - asset: assets/fonts/Arvo-BoldItalic.ttf
+        - asset: assets/fonts/Arvo-Italic.ttf
+          weight: 700
+
+    - family: Chewy
+      fonts:
+        - asset: assets/fonts/Chewy-Regular.ttf
+          weight: 700
+
+flutter_icons:
+  remove_alpha_ios: true
+  android: true
+  ios: true
+  image_path: "assets/images/logoapk.png"

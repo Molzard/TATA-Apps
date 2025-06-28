@@ -1,0 +1,40 @@
+{
+    "name": "TATA Apps",
+    "short_name": "TATA",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#hexcode",
+    "theme_color": "#hexcode",
+    "description": "TATA - Aplikasi Pemesanan Jasa Desain Grafis dan Percetakan",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "gcm_sender_id": "244660030535",
+    "related_applications": [],
+    "permissions": [
+        "notifications"
+    ],
+    "icons": [
+        {
+            "src": "icons/Icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-maskable-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "icons/Icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ]
+}

@@ -1,0 +1,2 @@
+G:/Tugas/Joki/Rama/TATA-apps/TATA-apps/tataapps/android/app/.cxx/Debug/p4r7533u/x86/CMakeFiles/edit_cache.dir
+G:/Tugas/Joki/Rama/TATA-apps/TATA-apps/tataapps/android/app/.cxx/Debug/p4r7533u/x86/CMakeFiles/rebuild_cache.dir

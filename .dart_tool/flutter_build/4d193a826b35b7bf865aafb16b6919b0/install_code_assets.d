@@ -1,0 +1,1 @@
+ G:\\Tugas\\Joki\\Rama\\TATA-apps\\TATA-apps\\tataapps\\.dart_tool\\flutter_build\\4d193a826b35b7bf865aafb16b6919b0\\native_assets.json: 
