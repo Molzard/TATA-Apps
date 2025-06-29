@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 
 class EmailJsOtp {
   // static const String serviceId = 'service_pa3nk91';
-  static const String serviceId = 'service_so8zovk';
+  static const String serviceId = 'service_rjg1cfg';
   // static const String templateId = 'template_amn3fm3';
   static const String templateId = 'template_u3s7loj';
   // static const String publicKey = 'H54XgmXddnw018hto';
@@ -16,8 +16,8 @@ class EmailJsOtp {
     String websiteLink = 'https://tata-apps.mazkama.web.id/',
     String? time,
   }) async {
-    // final url = Uri.parse('https://api.emailjs.com/api/v1.0/email/send');
-    final url = Uri.parse('https://tata-apps.mazkama.web.id/api/mail/send-otp');
+    final url = Uri.parse('https://api.emailjs.com/api/v1.0/email/send');
+    // final url = Uri.parse('https://tata-apps.mazkama.web.id/api/mail/send-otp');
     final now = DateTime.now();
     final expireTime = time ?? now.add(Duration(minutes: 15)).toString();
 
@@ -27,7 +27,7 @@ class EmailJsOtp {
       'user_id': publicKey,
       'template_params': {
         'email': email,
-        'otp': otp,
+        'passcode': otp,
         'company_name': companyName,
         'website_link': websiteLink,
         'time': expireTime,
@@ -38,6 +38,7 @@ class EmailJsOtp {
       url,
       headers: {
         'Content-Type': 'application/json',
+        'origin': 'https://tata-apps.mazkama.web.id'
       },
       body: jsonEncode(payload),
     );
