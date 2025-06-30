@@ -5,6 +5,7 @@ import 'package:TATA/helper/user_preferences.dart';
 import 'package:TATA/models/ChatModel.dart';
 import 'package:TATA/sendApi/Server.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 
 class ChatService {
   // Mengambil daftar chat
@@ -101,11 +102,15 @@ class ChatService {
 
   // Mengirim pesan
   static Future<Map<String, dynamic>> sendMessage(String chatId, String message) async {
+    print('=== [TATA-DEBUG] FUNGSI sendMessage DIPANGGIL ===');
     try {
       final token = await UserPreferences.getToken();
       if (token == null) {
         throw Exception('Token tidak ditemukan');
       }
+
+      final url = Server.urlLaravel('mobile/chat/send');
+      debugPrint('=== [TATA-DEBUG] URL SEND: $url');
 
       final response = await http.post(
         Server.urlLaravel('mobile/chat/send'),
@@ -120,7 +125,7 @@ class ChatService {
           'message_type': 'text',
         }),
       );
-      
+      debugPrint('=== [TATA-DEBUG] RESPONSE BODY CHAT: ${response.body}');
       debugPrint('Send message status: ${response.statusCode}');
 
       if (response.statusCode == 200) {

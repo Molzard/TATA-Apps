@@ -237,7 +237,7 @@ class FCMHelper {
       if (isAuthenticated) {
         // Gunakan AuthHelper untuk permintaan API
         final response = await authHelper.authenticatedRequest(
-          'mobile/user/profile/update',
+          'users/update-fcm-token',
           method: 'POST',
           body: jsonEncode({'fcm_token': token}),
         );

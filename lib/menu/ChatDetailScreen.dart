@@ -16,9 +16,9 @@ import 'dart:io' if (dart.library.html) 'dart:html' as html;
 
 class ChatDetailScreen extends StatefulWidget {
   final String chatId;
-  
+
   const ChatDetailScreen({required this.chatId, Key? key}) : super(key: key);
-  
+
   @override
   _ChatDetailScreenState createState() => _ChatDetailScreenState();
 }
@@ -26,15 +26,18 @@ class ChatDetailScreen extends StatefulWidget {
 class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final ChatService _chatService = ChatService();
   final TextEditingController _messageController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   String? _userId;
   ChatModel? _chatData;
   bool _isLoading = true;
   bool _isUploadingImage = false;
   List<Map<String, dynamic>> _messages = [];
   Map<String, dynamic>? _orderInfo;
-  
+
   Timer? _refreshTimer;
-  
+
+  final StreamController<List<Map<String, dynamic>>> _messagesController = StreamController.broadcast();
+
   @override
   void initState() {
     super.initState();
@@ -42,16 +45,16 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     print('Chat ID: ${widget.chatId}');
     print('Platform: ${kIsWeb ? "Web" : "Mobile"}');
     print('==============================');
-    
+
     _loadUserId();
     _loadChatData();
     _markMessagesAsRead();
     _loadMessages();
     _loadOrderInfo();
-    
+
     _startPeriodicRefresh();
   }
-  
+
   void _startPeriodicRefresh() {
     _refreshTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
       if (mounted) {
@@ -61,27 +64,29 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       }
     });
   }
-  
+
   @override
   void dispose() {
     _refreshTimer?.cancel();
     _messageController.dispose();
+    _messagesController.close();
+    _scrollController.dispose();
     super.dispose();
   }
-  
+
   Future<void> _loadUserId() async {
     try {
       final userData = await UserPreferences.getUser();
-      
+
       if (userData == null) {
         print('No user data found');
         return;
       }
-      
+
       print('ChatDetailScreen userData structure: $userData');
-      
+
       String? userId;
-      
+
       if (userData.containsKey('data') && userData['data'] != null) {
         final data = userData['data'];
         if (data is Map && data.containsKey('user') && data['user'] != null) {
@@ -98,7 +103,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       } else if (userData.containsKey('id')) {
         userId = userData['id'].toString();
       }
-      
+
       if (userId != null && userId.isNotEmpty) {
         if (mounted) {
           setState(() {
@@ -113,14 +118,14 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       print('Error loading user ID: $e');
     }
   }
-  
+
   Future<void> _loadChatData() async {
     try {
       final chatDoc = await FirebaseFirestore.instance
           .collection('chats')
           .doc(widget.chatId)
           .get();
-      
+
       if (chatDoc.exists && mounted) {
         setState(() {
           _chatData = ChatModel.fromFirestore(chatDoc);
@@ -140,17 +145,18 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       }
     }
   }
-  
+
   Future<void> _loadOrderInfo() async {
     try {
       final token = await UserPreferences.getToken();
+      print('Token yang digunakan: $token');
       if (token == null) {
         print('No token available for order info');
         return;
       }
-      
+
       print('Loading order info for: ${widget.chatId}');
-      
+
       final response = await http.get(
         Server.urlLaravel('mobile/pesanan/order-info/${widget.chatId}'),
         headers: {
@@ -158,10 +164,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           'Authorization': token,
         },
       );
-      
+
       print('Order info response status: ${response.statusCode}');
       print('Order info response body: ${response.body}');
-      
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == 'success' && mounted) {
@@ -173,45 +179,50 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           print('Order info API error: ${data['message']}');
         }
       } else {
-        print('Order info HTTP error: ${response.statusCode} - ${response.body}');
+        print(
+            'Order info HTTP error: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
       print('Error loading order info: $e');
     }
   }
-  
+
   void _markMessagesAsRead() {
     if (widget.chatId.isNotEmpty) {
       _chatService.markMessagesAsReadByOrderId(widget.chatId);
     }
   }
-  
+
   Future<void> _loadMessages() async {
     try {
       print('Loading messages for chat: ${widget.chatId}');
-      
       final response = await _chatService.getMessagesByOrderId(widget.chatId);
-      
+
       if (response != null && response['status'] == 'success') {
         final messages = response['messages'] as List<dynamic>? ?? [];
-        
+        final msgList = messages.map((msg) => Map<String, dynamic>.from(msg)).toList();
         if (mounted) {
+          _messages = msgList;
+          _messagesController.add(msgList); // <-- push ke stream
           setState(() {
-            _messages = messages.map((msg) => Map<String, dynamic>.from(msg)).toList();
             _isLoading = false;
           });
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (_scrollController.hasClients) {
+              _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+            }
+          });
         }
-        
         print('Loaded ${_messages.length} messages');
       } else {
         print('Failed to load messages: ${response?['message'] ?? 'Unknown error'}');
         if (mounted) {
+          _messages = [];
+          _messagesController.add([]);
           setState(() {
-            _messages = [];
             _isLoading = false;
           });
         }
-        
         if (response?['status'] != 'success' && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -224,12 +235,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     } catch (e) {
       print('Error loading messages: $e');
       if (mounted) {
+        _messages = [];
+        _messagesController.add([]);
         setState(() {
-          _messages = [];
           _isLoading = false;
         });
       }
-      
       if (!e.toString().contains('timeout') && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -240,7 +251,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       }
     }
   }
-  
+
   Future<void> _showAttachmentOptions() async {
     showModalBottomSheet(
       context: context,
@@ -249,7 +260,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           child: Wrap(
             children: [
               ListTile(
-                leading: Icon(Icons.photo_library, color: CustomColors.primaryColor),
+                leading:
+                    Icon(Icons.photo_library, color: CustomColors.primaryColor),
                 title: Text('Galeri'),
                 onTap: () {
                   Navigator.pop(context);
@@ -258,7 +270,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               ),
               if (!kIsWeb)
                 ListTile(
-                  leading: Icon(Icons.camera_alt, color: CustomColors.primaryColor),
+                  leading:
+                      Icon(Icons.camera_alt, color: CustomColors.primaryColor),
                   title: Text('Kamera'),
                   onTap: () {
                     Navigator.pop(context);
@@ -276,7 +289,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       },
     );
   }
-  
+
   Future<void> _pickImage(ImageSource source) async {
     try {
       final ImagePicker picker = ImagePicker();
@@ -286,7 +299,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         maxHeight: 1024,
         imageQuality: 80,
       );
-      
+
       if (image != null) {
         if (kIsWeb) {
           final Uint8List imageBytes = await image.readAsBytes();
@@ -307,7 +320,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       }
     }
   }
-  
+
   dynamic _createFile(String path) {
     if (kIsWeb) {
       return null;
@@ -315,28 +328,31 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       return null;
     }
   }
-  
-  Future<void> _uploadAndSendImageWeb(Uint8List imageBytes, String fileName) async {
+
+  Future<void> _uploadAndSendImageWeb(
+      Uint8List imageBytes, String fileName) async {
     if (_userId == null) return;
-    
+
     setState(() {
       _isUploadingImage = true;
     });
-    
+
     try {
       final token = await UserPreferences.getToken();
+      print('=== [TATA-DEBUG] Token yang digunakan: $token ===');
       if (token == null) {
         throw Exception('Token tidak ditemukan');
       }
-      
-      print('Uploading image (web): $fileName, size: ${imageBytes.length} bytes');
-      
+
+      print(
+          'Uploading image (web): $fileName, size: ${imageBytes.length} bytes');
+
       final uri = Server.urlLaravel('mobile/chat/upload');
       final request = http.MultipartRequest('POST', uri);
-      
+
       request.headers['Authorization'] = token;
       request.headers['Accept'] = 'application/json';
-      
+
       final image = http.MultipartFile.fromBytes(
         'file',
         imageBytes,
@@ -344,24 +360,24 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         contentType: MediaType('image', 'jpeg'),
       );
       request.files.add(image);
-      
+
       final response = await request.send();
       final responseString = await response.stream.bytesToString();
       final responseData = jsonDecode(responseString);
-      
+
       print('Upload response status: ${response.statusCode}');
       print('Upload response data: $responseData');
-      
+
       if (response.statusCode == 200 && responseData['status'] == 'success') {
         final fileUrl = responseData['data']['file_url'];
-        
+
         final messageResponse = await _chatService.sendMessageByOrderId(
           widget.chatId,
           'Mengirim gambar',
           messageType: 'image',
           fileUrl: fileUrl,
         );
-        
+
         if (messageResponse != null && messageResponse['status'] == 'success') {
           print('Image message sent successfully');
           await _loadMessages();
@@ -369,7 +385,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           throw Exception('Gagal mengirim pesan gambar');
         }
       } else {
-        throw Exception('Gagal upload gambar: ${responseData['message'] ?? 'Unknown error'}');
+        throw Exception(
+            'Gagal upload gambar: ${responseData['message'] ?? 'Unknown error'}');
       }
     } catch (e) {
       print('Error uploading image (web): $e');
@@ -386,16 +403,17 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       }
     }
   }
-  
+
   Future<void> _uploadAndSendImageMobile(dynamic imageFile) async {
     if (_userId == null) return;
-    
+
     setState(() {
       _isUploadingImage = true;
     });
-    
+
     try {
-      throw Exception('Mobile upload belum diimplementasikan. Gunakan web untuk upload gambar.');
+      throw Exception(
+          'Mobile upload belum diimplementasikan. Gunakan web untuk upload gambar.');
     } catch (e) {
       print('Error uploading image (mobile): $e');
       if (mounted) {
@@ -411,26 +429,29 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       }
     }
   }
-  
+
   void _sendMessage() async {
     if (_messageController.text.trim().isNotEmpty && _userId != null) {
       final messageText = _messageController.text.trim();
       _messageController.clear();
-      
+
       try {
         final response = await _chatService.sendMessageByOrderId(
           widget.chatId,
           messageText,
         );
-        
+
         if (response != null && response['status'] == 'success') {
           print('Message sent successfully');
           await _loadMessages();
         } else {
-          print('Failed to send message: ${response?['message'] ?? 'Unknown error'}');
+          print(
+              'Failed to send message: ${response?['message'] ?? 'Unknown error'}');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Gagal mengirim pesan: ${response?['message'] ?? 'Unknown error'}')),
+              SnackBar(
+                  content: Text(
+                      'Gagal mengirim pesan: ${response?['message'] ?? 'Unknown error'}')),
             );
           }
         }
@@ -448,7 +469,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       );
     }
   }
-  
+
   Widget _buildProductInfoBox() {
     if (_orderInfo == null) {
       return Container(
@@ -478,7 +499,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         ),
       );
     }
-    
+
     return Container(
       margin: const EdgeInsets.all(12),
       padding: const EdgeInsets.all(16),
@@ -527,10 +548,14 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             ),
             child: Column(
               children: [
-                _buildInfoRow('Nomor Pemesanan', '#${_orderInfo?['order_id'] ?? widget.chatId}'),
-                _buildInfoRow('Jenis', 'Desain ${_orderInfo?['jasa']?['kategori'] ?? 'Logo'}'),
-                _buildInfoRow('Paket', '${_orderInfo?['paket']?['kelas_jasa'] ?? 'Premium'}'),
-                _buildInfoRow('Metode Pembayaran', '${_orderInfo?['metode_pembayaran'] ?? 'Virtual Account'}'),
+                _buildInfoRow('Nomor Pemesanan',
+                    '#${_orderInfo?['order_id'] ?? widget.chatId}'),
+                _buildInfoRow('Jenis',
+                    'Desain ${_orderInfo?['jasa']?['kategori'] ?? 'Logo'}'),
+                _buildInfoRow('Paket',
+                    '${_orderInfo?['paket']?['kelas_jasa'] ?? 'Premium'}'),
+                _buildInfoRow('Metode Pembayaran',
+                    '${_orderInfo?['metode_pembayaran'] ?? 'Virtual Account'}'),
               ],
             ),
           ),
@@ -538,7 +563,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       ),
     );
   }
-  
+
   Widget _buildInfoRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -575,8 +600,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       ),
     );
   }
-  
-  Widget _buildMessageBubble(Map<String, dynamic> message, bool isFromUser, bool isSystemMessage) {
+
+  Widget _buildMessageBubble(
+      Map<String, dynamic> message, bool isFromUser, bool isSystemMessage) {
     if (isSystemMessage) {
       return Container(
         margin: const EdgeInsets.symmetric(vertical: 8),
@@ -603,10 +629,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         ),
       );
     }
-    
+
     final messageType = message['message_type'] ?? 'text';
     final isImage = messageType == 'image';
-    
+
     return Align(
       alignment: isFromUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -638,8 +664,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       child: Center(
                         child: CircularProgressIndicator(
                           value: loadingProgress.expectedTotalBytes != null
-                              ? loadingProgress.cumulativeBytesLoaded / 
-                                loadingProgress.expectedTotalBytes!
+                              ? loadingProgress.cumulativeBytesLoaded /
+                                  loadingProgress.expectedTotalBytes!
                               : null,
                         ),
                       ),
@@ -654,7 +680,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(Icons.broken_image, color: Colors.grey),
-                            Text('Gagal memuat gambar', style: TextStyle(color: Colors.grey)),
+                            Text('Gagal memuat gambar',
+                                style: TextStyle(color: Colors.grey)),
                           ],
                         ),
                       ),
@@ -662,10 +689,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   },
                 ),
               ),
-              if (message['message'] != null && message['message'].toString().isNotEmpty)
+              if (message['message'] != null &&
+                  message['message'].toString().isNotEmpty)
                 const SizedBox(height: 8),
             ],
-            if (message['message'] != null && message['message'].toString().isNotEmpty)
+            if (message['message'] != null &&
+                message['message'].toString().isNotEmpty)
               Text(
                 message['message'] ?? '',
                 style: TextStyle(
@@ -697,36 +726,53 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       ),
     );
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Chat dengan Admin'),
+        title: Text('Chat dengan Admin',
+            style: TextStyle(color: CustomColors.whiteColor),
+            ),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios,
+            color: CustomColors.whiteColor,
+          ),
+          onPressed: () {
+            Navigator.pop(context); // kembali ke halaman sebelumnya
+          },
+        ),
         backgroundColor: CustomColors.primaryColor,
       ),
       body: Column(
         children: [
           _buildProductInfoBox(),
-          
           Expanded(
-            child: _isLoading 
-              ? const Center(child: CircularProgressIndicator())
-              : _messages.isEmpty
-                ? const Center(child: Text('Belum ada pesan'))
-                : ListView.builder(
-                    padding: const EdgeInsets.all(12),
-                    itemCount: _messages.length,
-                    itemBuilder: (context, index) {
-                      final message = _messages[index];
-                      final isFromUser = message['sender_type'] == 'user';
-                      final isSystemMessage = message['sender_type'] == 'system';
-                      
-                      return _buildMessageBubble(message, isFromUser, isSystemMessage);
-                    },
-                  ),
-          ),
-          
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : StreamBuilder<List<Map<String, dynamic>>>(
+                      stream: _messagesController.stream,
+                      initialData: _messages,
+                      builder: (context, snapshot) {
+                        final messages = snapshot.data ?? [];
+                        if (messages.isEmpty) {
+                          return const Center(child: Text('Belum ada pesan'));
+                        }
+                        return ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.all(12),
+                          itemCount: messages.length,
+                          itemBuilder: (context, index) {
+                            final message = messages[index];
+                            final isFromUser = message['sender_type'] == 'user';
+                            final isSystemMessage = message['sender_type'] == 'system';
+                            return _buildMessageBubble(
+                                message, isFromUser, isSystemMessage);
+                          },
+                        );
+                      },
+                    ),
+            ),
           if (_isUploadingImage)
             Container(
               padding: const EdgeInsets.all(8),
@@ -742,7 +788,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 ],
               ),
             ),
-          
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
@@ -786,10 +831,22 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   ),
                 ),
                 IconButton(
-                  onPressed: _isUploadingImage ? null : _sendMessage,
+                  onPressed: _isUploadingImage
+                      ? null
+                      : () async {
+                          // Panggil fungsi ChatService.sendMessage secara eksplisit
+                          if (_messageController.text.trim().isNotEmpty &&
+                              _userId != null) {
+                            await _chatService.sendMessage(widget.chatId, _messageController.text.trim(), 'user');
+                            _messageController.clear();
+                            await _loadMessages();
+                          }
+                        },
                   icon: Icon(
                     Icons.send,
-                    color: _isUploadingImage ? Colors.grey : CustomColors.primaryColor,
+                    color: _isUploadingImage
+                        ? Colors.grey
+                        : CustomColors.primaryColor,
                   ),
                 ),
               ],
@@ -799,7 +856,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       ),
     );
   }
-  
+
   String _formatTimestamp(String timestamp) {
     try {
       final dateTime = DateTime.parse(timestamp).toLocal();
@@ -820,9 +877,17 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       return '';
     }
   }
-  
+
   String _getIndonesianWeekday(int weekday) {
-    const weekdays = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
+    const weekdays = [
+      'Senin',
+      'Selasa',
+      'Rabu',
+      'Kamis',
+      'Jumat',
+      'Sabtu',
+      'Minggu'
+    ];
     return weekdays[weekday - 1];
   }
-} 
+}

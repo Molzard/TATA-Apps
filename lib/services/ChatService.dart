@@ -217,11 +217,23 @@ class ChatService {
       await _firestore.collection('messages').add(message);
       
       // 2. Update chat room dengan pesan terakhir di Firestore
-      await _firestore.collection('chats').doc(chatId).update({
-        'last_message': content,
-        'updated_at': FieldValue.serverTimestamp(),
-        'unread_count': FieldValue.increment(1),
-      });
+      final chatDoc = _firestore.collection('chats').doc(chatId);
+      final chatSnapshot = await chatDoc.get();
+
+      if (!chatSnapshot.exists) {
+        await chatDoc.set({
+          'last_message': content,
+          'updated_at': FieldValue.serverTimestamp(),
+          'unread_count': 1,
+          // tambahkan field lain yang diperlukan
+        });
+      } else {
+        await chatDoc.update({
+          'last_message': content,
+          'updated_at': FieldValue.serverTimestamp(),
+          'unread_count': FieldValue.increment(1),
+        });
+      }
       
       // 3. ✅ SINKRONISASI KE LARAVEL DATABASE
       await _syncMessageToLaravel(chatId, content, senderType);
