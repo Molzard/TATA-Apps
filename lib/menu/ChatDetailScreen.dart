@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:TATA/models/ChatModel.dart';
 import 'package:TATA/services/ChatService.dart';
 import 'package:TATA/helper/user_preferences.dart';
 import 'package:TATA/src/CustomColors.dart';
@@ -12,7 +11,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'dart:io' if (dart.library.html) 'dart:html' as html;
+// import 'dart:io' if (dart.library.html) 'dart:html' as html;
+import 'dart:io' show File;
 
 class ChatDetailScreen extends StatefulWidget {
   final String chatId;
@@ -28,9 +28,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   String? _userId;
-  ChatModel? _chatData;
   bool _isLoading = true;
   bool _isUploadingImage = false;
+  String? _pesananUuid;
   List<Map<String, dynamic>> _messages = [];
   Map<String, dynamic>? _orderInfo;
 
@@ -128,8 +128,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
       if (chatDoc.exists && mounted) {
         setState(() {
-          _chatData = ChatModel.fromFirestore(chatDoc);
           _isLoading = false;
+          _pesananUuid = chatDoc['pesanan_uuid'];
         });
       } else if (mounted) {
         setState(() {
@@ -195,11 +195,35 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   Future<void> _loadMessages() async {
     try {
-      print('Loading messages for chat: ${widget.chatId}');
+      print('=== [TATA-DEBUG] Loading messages for chat: ${widget.chatId} ===');
       final response = await _chatService.getMessagesByOrderId(widget.chatId);
 
+      print('=== [TATA-DEBUG] Raw response: $response ===');
+
       if (response != null && response['status'] == 'success') {
-        final messages = response['messages'] as List<dynamic>? ?? [];
+        // Coba berbagai kemungkinan struktur response dari Laravel
+        List<dynamic> messages = [];
+        
+        if (response.containsKey('data')) {
+          // Jika response memiliki wrapper 'data'
+          final data = response['data'];
+          if (data is List) {
+            messages = data;
+          } else if (data is Map && data.containsKey('messages')) {
+            messages = data['messages'] as List<dynamic>? ?? [];
+          } else if (data is Map && data.containsKey('data')) {
+            messages = data['data'] as List<dynamic>? ?? [];
+          }
+        } else if (response.containsKey('messages')) {
+          // Jika response langsung memiliki 'messages'
+          messages = response['messages'] as List<dynamic>? ?? [];
+        } else {
+          // Jika response adalah array langsung (tidak mungkin karena sudah check status success)
+          print('=== [TATA-DEBUG] Unexpected response structure ===');
+        }
+
+        print('=== [TATA-DEBUG] Parsed messages count: ${messages.length} ===');
+        
         final msgList = messages.map((msg) => Map<String, dynamic>.from(msg)).toList();
         if (mounted) {
           _messages = msgList;
@@ -213,7 +237,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             }
           });
         }
-        print('Loaded ${_messages.length} messages');
+        print('=== [TATA-DEBUG] Loaded ${_messages.length} messages successfully ===');
       } else {
         print('Failed to load messages: ${response?['message'] ?? 'Unknown error'}');
         if (mounted) {
@@ -305,10 +329,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           final Uint8List imageBytes = await image.readAsBytes();
           await _uploadAndSendImageWeb(imageBytes, image.name);
         } else {
-          if (!kIsWeb) {
-            final dynamic imageFile = await _createFile(image.path);
-            await _uploadAndSendImageMobile(imageFile);
-          }
+          final imageFile = File(image.path); // Tidak error lagi
+          await _uploadAndSendImageMobile(imageFile);
         }
       }
     } catch (e) {
@@ -318,14 +340,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           SnackBar(content: Text('Gagal memilih gambar: $e')),
         );
       }
-    }
-  }
-
-  dynamic _createFile(String path) {
-    if (kIsWeb) {
-      return null;
-    } else {
-      return null;
     }
   }
 
@@ -347,7 +361,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       print(
           'Uploading image (web): $fileName, size: ${imageBytes.length} bytes');
 
-      final uri = Server.urlLaravel('mobile/chat/upload');
+      final uri = Server.urlLaravel('chat/upload');
       final request = http.MultipartRequest('POST', uri);
 
       request.headers['Authorization'] = token;
@@ -371,18 +385,25 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       if (response.statusCode == 200 && responseData['status'] == 'success') {
         final fileUrl = responseData['data']['file_url'];
 
-        final messageResponse = await _chatService.sendMessageByOrderId(
-          widget.chatId,
+        print('=== [TATA-DEBUG] Mengirim pesan gambar ===');
+        print('pesanan_uuid: ${_pesananUuid ?? widget.chatId}');
+        print('file_url: $fileUrl');
+
+        // Gunakan endpoint sendMessageByPesanan yang sesuai dengan Laravel
+        final messageResponse = await _chatService.sendMessageByPesanan(
+          _pesananUuid ?? widget.chatId,
           'Mengirim gambar',
           messageType: 'image',
           fileUrl: fileUrl,
         );
 
+        print('=== [TATA-DEBUG] Response pesan gambar: $messageResponse ===');
+
         if (messageResponse != null && messageResponse['status'] == 'success') {
           print('Image message sent successfully');
           await _loadMessages();
         } else {
-          throw Exception('Gagal mengirim pesan gambar');
+          throw Exception('Gagal mengirim pesan gambar: ${messageResponse?['message'] ?? 'Unknown error'}');
         }
       } else {
         throw Exception(
@@ -412,8 +433,53 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     });
 
     try {
-      throw Exception(
-          'Mobile upload belum diimplementasikan. Gunakan web untuk upload gambar.');
+      final token = await UserPreferences.getToken();
+      if (token == null) throw Exception('Token tidak ditemukan');
+
+      final uri = Server.urlLaravel('chat/upload');
+      final request = http.MultipartRequest('POST', uri);
+
+      request.headers['Authorization'] = token;
+      request.headers['Accept'] = 'application/json';
+
+      // Pastikan imageFile adalah File (dart:io)
+      request.files.add(await http.MultipartFile.fromPath(
+        'file',
+        imageFile.path,
+        contentType: MediaType('image', 'jpeg'),
+      ));
+
+      final response = await request.send();
+      final responseString = await response.stream.bytesToString();
+      final responseData = jsonDecode(responseString);
+
+      if (response.statusCode == 200 && responseData['status'] == 'success') {
+        final fileUrl = responseData['data']['file_url'];
+
+        print('=== [TATA-DEBUG] Mengirim pesan gambar ===');
+        print('pesanan_uuid: ${_pesananUuid ?? widget.chatId}');
+        print('file_url: $fileUrl');
+
+        // Gunakan endpoint sendMessageByPesanan yang sesuai dengan Laravel
+        final messageResponse = await _chatService.sendMessageByPesanan(
+          _pesananUuid ?? widget.chatId,
+          'Mengirim gambar',
+          messageType: 'image',
+          fileUrl: fileUrl,
+        );
+
+        print('=== [TATA-DEBUG] Response pesan gambar: $messageResponse ===');
+
+        if (messageResponse != null && messageResponse['status'] == 'success') {
+          print('Image message sent successfully');
+          await _loadMessages();
+        } else {
+          throw Exception('Gagal mengirim pesan gambar: ${messageResponse?['message'] ?? 'Unknown error'}');
+        }
+      } else {
+        throw Exception(
+            'Gagal upload gambar: ${responseData['message'] ?? 'Unknown error'}');
+      }
     } catch (e) {
       print('Error uploading image (mobile): $e');
       if (mounted) {
@@ -436,10 +502,16 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       _messageController.clear();
 
       try {
-        final response = await _chatService.sendMessageByOrderId(
-          widget.chatId,
+        print('=== [TATA-DEBUG] Mengirim pesan text ===');
+        print('pesanan_uuid: ${_pesananUuid ?? widget.chatId}');
+        print('message: $messageText');
+
+        final response = await _chatService.sendMessageByPesanan(
+          _pesananUuid ?? widget.chatId,
           messageText,
         );
+
+        print('=== [TATA-DEBUG] Response pesan text: $response ===');
 
         if (response != null && response['status'] == 'success') {
           print('Message sent successfully');

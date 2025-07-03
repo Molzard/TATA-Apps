@@ -83,7 +83,7 @@ class ChatService {
           'pesanan_uuid': orderReference,
           'message': message,
           'message_type': messageType,
-          'file_url': fileUrl,
+          if (fileUrl != null) 'file_url': fileUrl,
         }),
       ).timeout(
         const Duration(seconds: 15),
@@ -127,7 +127,7 @@ class ChatService {
           'Authorization': token,
         },
         body: jsonEncode({
-          'order_id': orderReference,
+          'pesanan_uuid': orderReference,
         }),
       );
       
@@ -141,6 +141,159 @@ class ChatService {
     } catch (e) {
       debugPrint('Error marking messages as read: $e');
       return null;
+    }
+  }
+  
+  // ✅ TAMBAHKAN METHOD BARU INI - Send message by pesanan UUID
+  Future<Map<String, dynamic>?> sendMessageByPesanan(
+    String pesananUuid,
+    String message, {
+    String messageType = 'text',
+    String? fileUrl,
+  }) async {
+    try {
+      final token = await UserPreferences.getToken();
+      if (token == null) {
+        debugPrint('No token available');
+        return null;
+      }
+
+      debugPrint('=== [TATA-DEBUG] sendMessageByPesanan ===');
+      debugPrint('pesanan_uuid: $pesananUuid');
+      debugPrint('message: $message');
+      debugPrint('message_type: $messageType');
+      debugPrint('file_url: $fileUrl');
+      debugPrint('=== [TATA-DEBUG] Token: ${token.substring(0, 30)}... ===');
+      
+      final requestBody = <String, dynamic>{
+        'pesanan_uuid': pesananUuid,
+        'message': message,
+        'message_type': messageType,
+      };
+      
+      // Only add file_url if it's not null
+      if (fileUrl != null && fileUrl.isNotEmpty) {
+        requestBody['file_url'] = fileUrl;
+      }
+      
+      debugPrint('=== [TATA-DEBUG] Request body: $requestBody ===');
+      
+      final headers = {
+        'Content-Type': 'application/json',
+        'Authorization': token,
+        'Accept': 'application/json',
+      };
+      debugPrint('=== [TATA-DEBUG] Headers: $headers ===');
+      
+      // Use the exact endpoint that exists in Laravel routes
+      final url = Server.urlLaravel('chat/send-by-pesanan');
+      debugPrint('=== [TATA-DEBUG] Final URL: $url ===');
+      debugPrint('=== [TATA-DEBUG] URL toString(): ${url.toString()} ===');
+      debugPrint('=== [TATA-DEBUG] Expected: https://tata-apps.mazkama.web.id/api/mobile/chat/send-by-pesanan ===');
+      
+      // Test with simpler send endpoint first
+      try {
+        final simpleUrl = Server.urlLaravel('chat/send');
+        debugPrint('=== [TATA-DEBUG] Testing simpler endpoint: $simpleUrl ===');
+        
+        // Try the simple endpoint with a different request format
+        final simpleRequestBody = <String, dynamic>{
+          'message': message,
+          'message_type': messageType,
+          'chat_uuid': pesananUuid,  // Use chat_uuid instead of pesanan_uuid for this endpoint
+        };
+        
+        if (fileUrl != null && fileUrl.isNotEmpty) {
+          simpleRequestBody['file_url'] = fileUrl;
+        }
+        
+        debugPrint('=== [TATA-DEBUG] Simple endpoint request body: $simpleRequestBody ===');
+        
+        final testResponse = await http.post(
+          simpleUrl,
+          headers: headers,
+          body: jsonEncode(simpleRequestBody),
+        ).timeout(const Duration(seconds: 10));
+        
+        debugPrint('=== [TATA-DEBUG] Simple send test status: ${testResponse.statusCode} ===');
+        if (testResponse.body.length <= 200) {
+          debugPrint('=== [TATA-DEBUG] Simple send test body: ${testResponse.body} ===');
+        } else {
+          debugPrint('=== [TATA-DEBUG] Simple send test body: ${testResponse.body.substring(0, 200)}... ===');
+        }
+        
+        if (testResponse.statusCode == 200) {
+          final data = jsonDecode(testResponse.body);
+          debugPrint('=== [TATA-DEBUG] Simple send worked! Using that instead ===');
+          return data;
+        }
+      } catch (e) {
+        debugPrint('=== [TATA-DEBUG] Simple send test failed: $e ===');
+      }
+
+      final response = await http.post(
+        url,
+        headers: headers,
+        body: jsonEncode(requestBody),
+      ).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          debugPrint('Send message by pesanan request timeout');
+          return http.Response('{"error":"timeout"}', 408);
+        },
+      );
+
+      debugPrint('=== [TATA-DEBUG] Response status: ${response.statusCode} ===');
+      debugPrint('=== [TATA-DEBUG] Response body: ${response.body} ===');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        debugPrint('Message sent by pesanan successfully');
+        return data;
+      } else if (response.statusCode == 404) {
+        // Try alternative request body format for send-by-pesanan
+        debugPrint('=== [TATA-DEBUG] 404 error, trying alternative request format ===');
+        
+        final altRequestBody = <String, dynamic>{
+          'pesanan_uuid': pesananUuid,  // Keep pesanan_uuid since the error said it's required
+          'message': message,
+          'message_type': messageType,  // Keep original message_type format
+        };
+        
+        if (fileUrl != null && fileUrl.isNotEmpty) {
+          altRequestBody['file_url'] = fileUrl;
+        }
+        
+        debugPrint('=== [TATA-DEBUG] Alternative request body: $altRequestBody ===');
+        
+        final altResponse = await http.post(
+          url,
+          headers: headers,
+          body: jsonEncode(altRequestBody),
+        ).timeout(const Duration(seconds: 15));
+        
+        debugPrint('=== [TATA-DEBUG] Alternative response status: ${altResponse.statusCode} ===');
+        if (altResponse.body.length <= 200) {
+          debugPrint('=== [TATA-DEBUG] Alternative response body: ${altResponse.body} ===');
+        } else {
+          debugPrint('=== [TATA-DEBUG] Alternative response body: ${altResponse.body.substring(0, 200)}... ===');
+        }
+        
+        if (altResponse.statusCode == 200) {
+          final data = jsonDecode(altResponse.body);
+          debugPrint('Message sent with alternative format successfully');
+          return data;
+        } else {
+          debugPrint('Failed to send message by pesanan: ${altResponse.body}');
+          return jsonDecode(altResponse.body);
+        }
+      } else {
+        debugPrint('Failed to send message by pesanan: ${response.body}');
+        return jsonDecode(response.body);
+      }
+    } catch (e) {
+      debugPrint('Error sending message by pesanan: $e');
+      return {'status': 'error', 'message': e.toString()};
     }
   }
   
@@ -257,7 +410,7 @@ class ChatService {
       }
       
       final response = await http.post(
-        Server.urlLaravel('mobile/chat/sync-message'),
+        Server.urlLaravel('chat/sync-message'),
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
@@ -356,7 +509,7 @@ class ChatService {
       }
       
       final response = await http.post(
-        Server.urlLaravel('mobile/chat/send-notification'),
+        Server.urlLaravel('chat/send-notification'),
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
@@ -428,7 +581,7 @@ class ChatService {
       print('Using token: ${token?.substring(0, 20)}...');
       
       final response = await http.post(
-        Server.urlLaravel('mobile/chat/create-for-order'),
+        Server.urlLaravel('chat/create-for-order'),
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
