@@ -5,6 +5,7 @@ import 'package:TATA/helper/user_preferences.dart';
 import 'package:TATA/menu/ChatDetailScreen.dart';
 import 'package:TATA/src/CustomColors.dart';
 import 'package:intl/intl.dart';
+import 'dart:async';
 
 class ChatListScreen extends StatefulWidget {
   const ChatListScreen({Key? key}) : super(key: key);
@@ -14,16 +15,33 @@ class ChatListScreen extends StatefulWidget {
 }
 
 class _ChatListScreenState extends State<ChatListScreen> {
-  String? _userId;
   bool _isLoading = true;
   bool _isAuthenticated = false;
   List<ChatModel> _chatList = [];
   String? _error;
   
+  Timer? _refreshTimer;
+  
   @override
   void initState() {
     super.initState();
     _checkAuthentication();
+  }
+  
+  void _startPeriodicRefresh() {
+    _refreshTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (mounted && _isAuthenticated) {
+        _loadChatList(showLoading: false); // Silent refresh tanpa loading animation
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+  
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
   }
   
   Future<void> _checkAuthentication() async {
@@ -62,12 +80,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
       
       if (userId != null && userId.isNotEmpty) {
         setState(() {
-          _userId = userId;
           _isAuthenticated = true;
         });
         print('ChatListScreen userId set to: $userId');
         
         await _loadChatList();
+        _startPeriodicRefresh();
       } else {
         print('Could not extract user ID from userData in ChatListScreen');
         setState(() {
@@ -85,29 +103,53 @@ class _ChatListScreenState extends State<ChatListScreen> {
     }
   }
   
-  Future<void> _loadChatList() async {
+  Future<void> _loadChatList({bool showLoading = true}) async {
     try {
-      setState(() {
-        _isLoading = true;
-        _error = null;
-      });
+      if (showLoading) {
+        setState(() {
+          _isLoading = true;
+          _error = null;
+        });
+      }
       
       print('Loading chat list...');
       
       final chatList = await ChatService.getChatList();
       
-      setState(() {
-        _chatList = chatList;
-        _isLoading = false;
-      });
+      // Remove duplicates based on chat_uuid or id
+      final Map<String, ChatModel> uniqueChats = {};
+      for (final chat in chatList) {
+        final key = chat.orderReference ?? chat.id;
+        if (!uniqueChats.containsKey(key) || 
+            (uniqueChats[key]!.updatedAt.isBefore(chat.updatedAt))) {
+          uniqueChats[key] = chat;
+        }
+      }
+      
+      final uniqueChatList = uniqueChats.values.toList();
+      // Sort by updatedAt in descending order (newest first)
+      uniqueChatList.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      
+      if (mounted) {
+        setState(() {
+          _chatList = uniqueChatList;
+          if (showLoading) {
+            _isLoading = false;
+          }
+        });
+      }
       
       print('Loaded ${chatList.length} chats');
     } catch (e) {
       print('Error loading chat list: $e');
-      setState(() {
-        _isLoading = false;
-        _error = e.toString();
-      });
+      if (mounted) {
+        setState(() {
+          if (showLoading) {
+            _isLoading = false;
+            _error = e.toString();
+          }
+        });
+      }
     }
   }
   
@@ -136,7 +178,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
     if (_isLoading) {
       return Scaffold(
         appBar: AppBar(
-          title: Text('Chat'),
+          title: Text('Chat',
+            style: TextStyle(color: CustomColors.whiteColor),
+          ),
           backgroundColor: CustomColors.primaryColor,
         ),
         body: Center(child: CircularProgressIndicator()),
@@ -146,7 +190,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
     if (!_isAuthenticated) {
       return Scaffold(
         appBar: AppBar(
-          title: Text('Chat'),
+          title: Text('Chat',
+            style: TextStyle(color: CustomColors.whiteColor),
+          ),
           backgroundColor: CustomColors.primaryColor,
         ),
         body: Center(
@@ -190,7 +236,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
     if (_error != null) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Chat'),
+          automaticallyImplyLeading: false,
+          title: Text('Chat',
+            style: TextStyle(color: CustomColors.whiteColor),
+          ),
           backgroundColor: CustomColors.primaryColor,
         ),
         body: Center(
@@ -229,12 +278,16 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Chat'),
+        title: Text('Chat',
+            style: TextStyle(color: CustomColors.whiteColor),
+          ),
         backgroundColor: CustomColors.primaryColor,
         actions: [
           IconButton(
             onPressed: _loadChatList,
-            icon: Icon(Icons.refresh),
+            icon: Icon(Icons.refresh,
+            color: CustomColors.whiteColor
+          ),
           ),
         ],
       ),
@@ -262,7 +315,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: CustomColors.primaryColor,
                     ),
-                    child: const Text('Refresh'),
+                    child: Text('Refresh',
+                      style: TextStyle(color: CustomColors.whiteColor),
+                    ),
                   ),
                 ],
               ),
@@ -364,7 +419,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
           _loadChatList();
         },
         backgroundColor: CustomColors.primaryColor,
-        child: const Icon(Icons.refresh),
+        child: Icon(Icons.refresh,
+          color: CustomColors.whiteColor,
+        ),
       ),
     );
   }

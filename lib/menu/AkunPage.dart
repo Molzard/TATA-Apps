@@ -2,10 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:TATA/BeforeLogin/page_login.dart';
-import 'package:TATA/helper/fcm_helper.dart';
 import 'package:TATA/helper/user_preferences.dart';
 import 'package:TATA/sendApi/Server.dart';
-import 'package:TATA/sendApi/userApi.dart';
 import 'package:TATA/src/CustomColors.dart';
 import 'package:TATA/src/pageTransition.dart';
 import 'package:flutter/foundation.dart';
@@ -296,33 +294,63 @@ class _ProfileScreenState extends State<Akunpage> {
   }
 
   Widget buildInputField({
-    // required String label,
     required TextInputType kerboardType,
     required IconData icon,
     required TextEditingController controller,
     bool enabled = false,
+    String? hintText,
   }) {
     return Container(
-      margin: EdgeInsets.symmetric(vertical: 10),
+      margin: EdgeInsets.symmetric(vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4)],
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          )
+        ],
       ),
       child: TextField(
         controller: controller,
         enabled: enabled,
         keyboardType: kerboardType,
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+          color: enabled ? Colors.black87 : Colors.grey.shade600,
+        ),
         decoration: InputDecoration(
-          // labelText: label,
-
-          prefixIcon: Icon(icon),
+          hintText: hintText,
+          hintStyle: TextStyle(
+            color: Colors.grey.shade400,
+            fontSize: 14,
+          ),
+          prefixIcon: Container(
+            margin: EdgeInsets.only(right: 12),
+            child: Icon(
+              icon,
+              color: enabled ? CustomColors.primaryColor : Colors.grey.shade400,
+              size: 22,
+            ),
+          ),
           border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(15),
-              borderSide: BorderSide.none),
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(color: Colors.grey.shade200, width: 1),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(color: CustomColors.primaryColor, width: 2),
+          ),
           filled: true,
-          fillColor: Colors.white,
-          contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+          fillColor: enabled ? Colors.white : Colors.grey.shade50,
+          contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 18),
         ),
       ),
     );
@@ -373,257 +401,405 @@ class _ProfileScreenState extends State<Akunpage> {
                   ),
                 ),
               )),
-          Container(
+          SafeArea(
             child: isLoading
-                ? Center(child: CircularProgressIndicator(color: Colors.white))
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 3,
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          'Memuat profil...',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
                 : SingleChildScrollView(
-                    padding: EdgeInsets.fromLTRB(25, 16, 25, 16),
+                    padding: EdgeInsets.fromLTRB(20, 16, 20, 20),
                     child: Column(
                       children: [
-                        if (isEditing)
-                          Container(
-                            margin: EdgeInsets.only(top: 30, bottom: 20),
-                            width: double.infinity,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                TextButton(
-                                  onPressed: bataledit,
-                                  child: Card(
-                                    color: CustomColors.redColor,
-                                    child: Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 15, vertical: 5),
-                                        child: Text('Batal',
-                                            style: TextStyle(
-                                                color: Colors.white))),
+                        // Header with action buttons
+                        Container(
+                          margin: EdgeInsets.only(top: 10, bottom: 30),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              // Title
+                              Container(
+                                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.9),
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.1),
+                                      blurRadius: 8,
+                                      offset: Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Text(
+                                  'Profil Saya',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: CustomColors.primaryColor,
                                   ),
                                 ),
-                                TextButton(
-                                    onPressed: updateUserProfile,
-                                    child: Card(
-                                      color: CustomColors.card2,
-                                      child: Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 15, vertical: 5),
-                                          child: Text('Simpan',
-                                              style: TextStyle(
-                                                  color: CustomColors
-                                                      .whiteColor))),
-                                    ))
-                              ],
-                            ),
-                          )
-                        else
-                          Container(
-                            margin: EdgeInsets.only(top: 10, bottom: 20),
-                            width: double.infinity,
-                            child: Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  TextButton(
-                                    onPressed: () =>
-                                        setState(() => isEditing = true),
-                                    child: Card(
-                                      color: CustomColors.whiteColor,
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 15, vertical: 5),
-                                        child: Text('Edit',
-                                            style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                color:
-                                                    CustomColors.primaryColor)),
+                              ),
+                              // Action buttons
+                              if (isEditing)
+                                Row(
+                                  children: [
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(12),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(0.1),
+                                            blurRadius: 8,
+                                            offset: Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: ElevatedButton.icon(
+                                        onPressed: bataledit,
+                                        icon: Icon(Icons.close, size: 18),
+                                        label: Text('Batal'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.red.shade400,
+                                          foregroundColor: Colors.white,
+                                          elevation: 0,
+                                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                        ),
                                       ),
                                     ),
-                                  )
-                                ]),
+                                    SizedBox(width: 8),
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(12),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(0.1),
+                                            blurRadius: 8,
+                                            offset: Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: ElevatedButton.icon(
+                                        onPressed: updateUserProfile,
+                                        icon: Icon(Icons.check, size: 18),
+                                        label: Text('Simpan'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.green.shade500,
+                                          foregroundColor: Colors.white,
+                                          elevation: 0,
+                                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              else
+                                Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.1),
+                                        blurRadius: 8,
+                                        offset: Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: ElevatedButton.icon(
+                                    onPressed: () => setState(() => isEditing = true),
+                                    icon: Icon(Icons.edit, size: 18),
+                                    label: Text('Edit Profil'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.white,
+                                      foregroundColor: CustomColors.primaryColor,
+                                      elevation: 0,
+                                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
+                        ),
+                        
+                        // Profile picture section
                         Container(
-                          margin: EdgeInsets.all(5),
-                          child: Card(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(
-                                  100), // Opsional, untuk estetika kartu
-                            ),
-                            color: CustomColors.whiteColor,
-                            child: Padding(
-                              padding: const EdgeInsets.all(
-                                  3), // Jaga jarak agar bulatan tidak terpotong
-                              child: ClipOval(
-                                child: hasSelectedImage
-                                    ? kIsWeb && selectedImageWeb != null
-                                        ? Image.memory(
-                                            selectedImageWeb!,
-                                            width: 120,
-                                            height: 120,
-                                            fit: BoxFit.cover,
-                                          )
-                                        : !kIsWeb && selectedImageFile != null
-                                            ? Image.file(
-                                                selectedImageFile!,
-                                                width: 120,
-                                                height: 120,
+                          margin: EdgeInsets.only(bottom: 24),
+                          child: Stack(
+                            children: [
+                              Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.2),
+                                      blurRadius: 20,
+                                      offset: Offset(0, 8),
+                                    ),
+                                  ],
+                                ),
+                                child: Container(
+                                  padding: EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Colors.white,
+                                    border: Border.all(
+                                      color: Colors.white,
+                                      width: 4,
+                                    ),
+                                  ),
+                                  child: ClipOval(
+                                    child: hasSelectedImage
+                                        ? kIsWeb && selectedImageWeb != null
+                                            ? Image.memory(
+                                                selectedImageWeb!,
+                                                width: 140,
+                                                height: 140,
                                                 fit: BoxFit.cover,
+                                              )
+                                            : !kIsWeb && selectedImageFile != null
+                                                ? Image.file(
+                                                    selectedImageFile!,
+                                                    width: 140,
+                                                    height: 140,
+                                                    fit: BoxFit.cover,
+                                                  )
+                                                : Image.asset(
+                                                    Server.UrlGambar('logotext.png'),
+                                                    width: 140,
+                                                    height: 140,
+                                                  )
+                                        : imageProfil.isNotEmpty
+                                            ? Image.network(
+                                                Server.UrlImageProfil(imageProfil),
+                                                width: 140,
+                                                height: 140,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (context, error, stackTrace) {
+                                                  print('Error loading profile image: $error');
+                                                  return Image.asset(
+                                                    Server.UrlGambar('logotext.png'),
+                                                    width: 140,
+                                                    height: 140,
+                                                  );
+                                                },
                                               )
                                             : Image.asset(
                                                 Server.UrlGambar('logotext.png'),
-                                                width: 120,
-                                                height: 120,
-                                              )
-                                    : imageProfil.isNotEmpty
-                                        ? Image.network(
-                                            Server.UrlImageProfil(imageProfil),
-                                            width: 120,
-                                            height: 120,
-                                            fit: BoxFit.cover,
-                                            errorBuilder: (context, error, stackTrace) {
-                                              print('Error loading profile image: $error');
-                                              // Coba gunakan URL alternatif jika terjadi error
-                                              if (kIsWeb) {
-                                                // Untuk web, coba gunakan URL proxy sebagai fallback
-                                                return Image.asset(
-                                                  Server.UrlGambar('logotext.png'),
-                                                  width: 120,
-                                                  height: 120,
-                                                );
-                                              } else {
-                                                return Image.asset(
-                                                  Server.UrlGambar('logotext.png'),
-                                                  width: 120,
-                                                  height: 120,
-                                                );
-                                              }
-                                            },
-                                          )
-                                        : Image.asset(
-                                            Server.UrlGambar('logotext.png'),
-                                            width: 120,
-                                            height: 120,
-                                          ),
+                                                width: 140,
+                                                height: 140,
+                                              ),
+                                  ),
+                                ),
+                              ),
+                              if (isEditing)
+                                Positioned(
+                                  bottom: 5,
+                                  right: 5,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: CustomColors.primaryColor,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.2),
+                                          blurRadius: 8,
+                                          offset: Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: IconButton(
+                                      onPressed: pickImage,
+                                      icon: Icon(
+                                        Icons.camera_alt,
+                                        color: Colors.white,
+                                        size: 20,
+                                      ),
+                                      padding: EdgeInsets.all(8),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+
+                        // Input fields section
+                        Container(
+                          padding: EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.95),
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 15,
+                                offset: Offset(0, 5),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Informasi Profil',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              SizedBox(height: 20),
+                              buildInputField(
+                                kerboardType: TextInputType.name,
+                                icon: Icons.person_outline,
+                                controller: nameController,
+                                enabled: isEditing,
+                                hintText: 'Nama lengkap',
+                              ),
+                              buildInputField(
+                                kerboardType: TextInputType.emailAddress,
+                                icon: Icons.email_outlined,
+                                controller: emailController,
+                                enabled: isEditing,
+                                hintText: 'Alamat email',
+                              ),
+                              buildInputField(
+                                kerboardType: TextInputType.number,
+                                icon: Icons.phone_outlined,
+                                controller: phoneController,
+                                enabled: isEditing,
+                                hintText: 'Nomor telepon',
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        SizedBox(height: 40),
+                        
+                        // Logout button
+                        Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 12,
+                                offset: Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: ElevatedButton.icon(
+                            onPressed: () async {
+                              try {
+                                // Hapus FCM token dari server
+                                final userData = await UserPreferences.getUser();
+                                if (userData != null) {
+                                  final fcmToken = await UserPreferences.getFcmToken();
+                                  if (fcmToken != null) {
+                                    try {
+                                      // Extract token from different possible structures
+                                      String? authToken;
+                                      if (userData.containsKey('access_token')) {
+                                        authToken = userData['access_token'];
+                                      } else if (userData.containsKey('data') && 
+                                                userData['data'] != null && 
+                                                userData['data'].containsKey('access_token')) {
+                                        authToken = userData['data']['access_token'];
+                                      }
+                                      
+                                      if (authToken != null) {
+                                        // Kirim permintaan untuk menghapus token
+                                        await http.post(
+                                          Server.urlLaravel('api/users/logout'),
+                                          headers: {
+                                            'Content-Type': 'application/json',
+                                            'Accept': 'application/json',
+                                            'Authorization': 'Bearer $authToken',
+                                          },
+                                          body: jsonEncode({
+                                            'fcm_token': fcmToken
+                                          }),
+                                        );
+                                      }
+                                    } catch (e) {
+                                      print('Error menghapus FCM token dari server: $e');
+                                    }
+                                  }
+                                }
+                                
+                                // Hapus data user dan FCM token dari SharedPreferences
+                                await UserPreferences.removeUser();
+                                await UserPreferences.removeFcmToken();
+                                
+                                // Logout dari Firebase Auth jika menggunakan Firebase Auth
+                                if (FirebaseAuth.instance.currentUser != null) {
+                                  await FirebaseAuth.instance.signOut();
+                                }
+                                
+                                // Arahkan ke halaman login
+                                Navigator.pushReplacement(
+                                  context, 
+                                  SmoothPageTransition(page: page_login())
+                                );
+                              } catch (e) {
+                                print('Error during logout: $e');
+                                // Tetap arahkan ke halaman login meskipun terjadi error
+                                Navigator.pushReplacement(
+                                  context, 
+                                  SmoothPageTransition(page: page_login())
+                                );
+                              }
+                            },
+                            icon: Icon(
+                              Icons.logout_rounded,
+                              color: Colors.white,
+                              size: 22,
+                            ),
+                            label: Text(
+                              'Keluar dari Akun',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Color(0xFF09143C),
+                              elevation: 0,
+                              padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
                               ),
                             ),
                           ),
                         ),
-                        if (isEditing)
-                          TextButton.icon(
-                            onPressed: pickImage,
-                            icon: Icon(Icons.photo_camera, color: Colors.white),
-                            label: Text('Pilih Foto',
-                                style: TextStyle(color: Colors.white)),
-                            style: TextButton.styleFrom(
-                                backgroundColor: Colors.blue,
-                                padding: EdgeInsets.all(8)),
-                          ),
+                        
                         SizedBox(height: 20),
-                        Text(
-                          nameController.text,
-                          style: TextStyle(
-                              fontSize: 25, fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          emailController.text,
-                          style: TextStyle(
-                              overflow: TextOverflow.ellipsis,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold),
-                        ),
-                        SizedBox(height: 20),
-                        buildInputField(
-                            kerboardType: TextInputType.name,
-                            icon: Icons.person,
-                            controller: nameController,
-                            enabled: isEditing),
-                        buildInputField(
-                            kerboardType: TextInputType.emailAddress,
-                            icon: Icons.email,
-                            controller: emailController,
-                            enabled: isEditing),
-                        buildInputField(
-                            kerboardType: TextInputType.number,
-                            icon: Icons.phone,
-                            controller: phoneController,
-                            enabled: isEditing),
-                        SizedBox(height: 30),
-                        ElevatedButton.icon(
-                          onPressed: () async {
-                            try {
-                              // Hapus FCM token dari server
-                              final userData = await UserPreferences.getUser();
-                              if (userData != null) {
-                                final fcmToken = await UserPreferences.getFcmToken();
-                                if (fcmToken != null) {
-                                  try {
-                                    // Extract token from different possible structures
-                                    String? authToken;
-                                    if (userData.containsKey('access_token')) {
-                                      authToken = userData['access_token'];
-                                    } else if (userData.containsKey('data') && 
-                                              userData['data'] != null && 
-                                              userData['data'].containsKey('access_token')) {
-                                      authToken = userData['data']['access_token'];
-                                    }
-                                    
-                                    if (authToken != null) {
-                                      // Kirim permintaan untuk menghapus token
-                                      await http.post(
-                                        Server.urlLaravel('api/users/logout'),
-                                        headers: {
-                                          'Content-Type': 'application/json',
-                                          'Accept': 'application/json',
-                                          'Authorization': 'Bearer $authToken',
-                                        },
-                                        body: jsonEncode({
-                                          'fcm_token': fcmToken
-                                        }),
-                                      );
-                                    }
-                                  } catch (e) {
-                                    print('Error menghapus FCM token dari server: $e');
-                                  }
-                                }
-                              }
-                              
-                              // Hapus data user dan FCM token dari SharedPreferences
-                              await UserPreferences.removeUser();
-                              await UserPreferences.removeFcmToken();
-                              
-                              // Logout dari Firebase Auth jika menggunakan Firebase Auth
-                              if (FirebaseAuth.instance.currentUser != null) {
-                                await FirebaseAuth.instance.signOut();
-                              }
-                              
-                              // Arahkan ke halaman login
-                              Navigator.pushReplacement(
-                                context, 
-                                SmoothPageTransition(page: page_login())
-                              );
-                            } catch (e) {
-                              print('Error during logout: $e');
-                              // Tetap arahkan ke halaman login meskipun terjadi error
-                              Navigator.pushReplacement(
-                                context, 
-                                SmoothPageTransition(page: page_login())
-                              );
-                            }
-                          },
-                          icon: Icon(
-                            Icons.logout,
-                            color: CustomColors.whiteColor,
-                          ),
-                          label: Text(
-                            'Logout',
-                            style: TextStyle(
-                                fontSize: 18, color: CustomColors.whiteColor),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Color(0xFF09143C),
-                            padding: EdgeInsets.symmetric(
-                                horizontal: 32, vertical: 14),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12)),
-                          ),
-                        )
                       ],
                     ),
                   ),

@@ -352,12 +352,21 @@ class ChatService {
         throw Exception('Token tidak ditemukan');
       }
 
-      debugPrint('Creating direct chat with product context: $productContext');
+      debugPrint('=== [CHATSERVICE-DEBUG] Creating direct chat ===');
+      debugPrint('Product context: $productContext');
 
       // Debug URL
       final url = Server.urlLaravel('mobile/chat/create-direct');
       debugPrint('API URL: $url');
       debugPrint('Token: ${token.substring(0, math.min(20, token.length))}...');
+
+      final requestBody = {
+        'context_type': 'product_info',
+        'context_data': productContext,
+        'initial_message': 'Halo, saya tertarik dengan produk ini',
+      };
+      
+      debugPrint('Request body: ${jsonEncode(requestBody)}');
 
       final response = await http.post(
         url,
@@ -366,27 +375,31 @@ class ChatService {
           'Content-Type': 'application/json',
           'Authorization': token,
         },
-        body: jsonEncode({
-          'context_type': 'product_info',
-          'context_data': productContext,
-          'initial_message': 'Halo, saya tertarik dengan produk ini',
-        }),
+        body: jsonEncode(requestBody),
       );
       
+      debugPrint('=== [CHATSERVICE-DEBUG] Response ===');
       debugPrint('Response status: ${response.statusCode}');
+      debugPrint('Response headers: ${response.headers}');
       debugPrint('Response body: ${response.body}');
       
       final responseData = jsonDecode(response.body);
+      debugPrint('Parsed response: $responseData');
       
       if (response.statusCode >= 200 && response.statusCode < 300) {
+        debugPrint('=== [CHATSERVICE-DEBUG] Success ===');
+        debugPrint('Returning success response: $responseData');
         return responseData;
       } else {
+        debugPrint('=== [CHATSERVICE-DEBUG] Error ===');
+        debugPrint('Error response: $responseData');
         return {
           'status': 'error',
           'message': responseData['message'] ?? 'Failed to create chat: ${response.statusCode}'
         };
       }
     } catch (e) {
+      debugPrint('=== [CHATSERVICE-DEBUG] Exception ===');
       debugPrint('Error creating direct chat: $e');
       return {
         'status': 'error',

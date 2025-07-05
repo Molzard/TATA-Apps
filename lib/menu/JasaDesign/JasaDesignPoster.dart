@@ -1,13 +1,12 @@
 import 'package:TATA/helper/user_preferences.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 
-import 'package:TATA/main.dart';
 import 'package:TATA/src/pageTransition.dart';
 import 'package:TATA/menu/JasaDesign/DeskripsiPesanan/DeskripsiPoster.dart';
 import 'package:TATA/src/CustomColors.dart';
 import 'package:TATA/sendApi/Server.dart';
+import 'package:TATA/sendApi/ChatService.dart';
+import 'package:TATA/menu/ChatDetailScreen.dart';
 
 class JasaDesignPoster extends StatefulWidget {
   const JasaDesignPoster({super.key});
@@ -141,6 +140,91 @@ class _PosterPackagePageState extends State<JasaDesignPoster>
       ),
     );
     print(selectedPackage);
+  }
+
+  Future<void> _openChatWithContext() async {
+    try {
+      final selectedPackage = packages[_tabController.index];
+      setState(() {
+        isLoading = true;
+      });
+      
+      print('=== [CHAT-DEBUG] Creating direct chat with context ===');
+      print('Selected Package: $selectedPackage');
+      
+      // Debug URL
+      final token = await UserPreferences.getToken();
+      final url = Server.urlLaravel('mobile/chat/create-direct').toString();
+      print('API URL: $url');
+      print('Token available: ${token != null}');
+      print('Token: ${token?.substring(0, 20)}...');
+      
+      final result = await ChatService.createDirectChatWithContext(selectedPackage);
+      
+      print('=== [CHAT-DEBUG] API Response ===');
+      print('Full result: $result');
+      print('Status: ${result['status']}');
+      print('Message: ${result['message']}');
+      print('Data: ${result['data']}');
+      print('Is existing chat: ${result['data']?['is_existing']}');
+      
+      setState(() {
+        isLoading = false;
+      });
+      
+      if (result['status'] == 'success') {
+        final chatId = result['data']['chat_id'];
+        final isExisting = result['data']['is_existing'] ?? false;
+        
+        print('=== [CHAT-DEBUG] Navigation Info ===');
+        print('Chat ID: $chatId');
+        print('Is existing chat: $isExisting');
+        
+        if (isExisting) {
+          print('Using existing chat room');
+        } else {
+          print('Created new chat room');
+        }
+        
+        // Navigate to chat detail screen
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ChatDetailScreen(chatId: chatId),
+          ),
+        );
+      } else {
+        print('Failed to create chat: ${result['message']}');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal membuat chat: ${result['message']}'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'Coba Lagi',
+              onPressed: () => _openChatWithContext(),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error in _openChatWithContext: $e');
+      setState(() {
+        isLoading = false;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 5),
+          action: SnackBarAction(
+            label: 'Coba Lagi',
+            onPressed: () => _openChatWithContext(),
+          ),
+        ),
+      );
+    }
   }
 
   Widget _buildCheck(bool isIncluded) {
@@ -318,15 +402,7 @@ class _PosterPackagePageState extends State<JasaDesignPoster>
                             color: CustomColors.whiteColor,
                             elevation: 5,
                             child: IconButton(
-                                onPressed: () {
-                                  Navigator.pushAndRemoveUntil(
-                                    context,
-                                    MaterialPageRoute(
-                                        builder: (_) =>
-                                            MainPage(initialIndex: 2)),
-                                    (route) => false,
-                                  );
-                                },
+                                onPressed: _openChatWithContext,
                                 icon: Image.asset(
                                     Server.UrlGambar("chaticon.png")))),
                       ),

@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:math' as math;
 
-import 'package:TATA/main.dart';
+
 import 'package:TATA/src/pageTransition.dart';
 import 'package:TATA/menu/JasaDesign/DeskripsiPesanan/DeskripsiLogo.dart';
 import 'package:TATA/src/CustomColors.dart';
@@ -153,15 +153,33 @@ class _LogoPackagePageState extends State<JasaDesignLogo>
         isLoading = true;
       });
       
-      print('Creating direct chat with context: $selectedPackage');
+      print('=== [CHAT-DEBUG] Creating direct chat with context ===');
+      print('Selected Package: $selectedPackage');
+      
+      // **TAMBAHAN: Debug context data yang akan dikirim**
+      print('=== [CONTEXT-DEBUG] JasaDesignLogo ===');
+      print('Package ID: ${selectedPackage['id_paket_jasa']}');
+      print('Jasa ID: ${selectedPackage['id_jasa']}');
+      print('Jenis Pesanan: ${selectedPackage['jenis_pesanan']}');
+      print('Title: ${selectedPackage['title']}');
+      print('Price: ${selectedPackage['price']}');
+      print('Full context data: ${jsonEncode(selectedPackage)}');
       
       // Debug URL
       final token = await UserPreferences.getToken();
       final url = Server.urlLaravel('mobile/chat/create-direct').toString();
       print('API URL: $url');
       print('Token available: ${token != null}');
+      print('Token: ${token?.substring(0, 20)}...');
       
       final result = await ChatService.createDirectChatWithContext(selectedPackage);
+      
+      print('=== [CHAT-DEBUG] API Response ===');
+      print('Full result: $result');
+      print('Status: ${result['status']}');
+      print('Message: ${result['message']}');
+      print('Data: ${result['data']}');
+      print('Is existing chat: ${result['data']?['is_existing']}');
       
       setState(() {
         isLoading = false;
@@ -169,7 +187,17 @@ class _LogoPackagePageState extends State<JasaDesignLogo>
       
       if (result['status'] == 'success') {
         final chatId = result['data']['chat_id'];
-        print('Chat created successfully with ID: $chatId');
+        final isExisting = result['data']['is_existing'] ?? false;
+        
+        print('=== [CHAT-DEBUG] Navigation Info ===');
+        print('Chat ID: $chatId');
+        print('Is existing chat: $isExisting');
+        
+        if (isExisting) {
+          print('Using existing chat room');
+        } else {
+          print('Created new chat room');
+        }
         
         // Navigate to chat detail screen
         Navigator.push(

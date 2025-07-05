@@ -1,9 +1,7 @@
 import 'package:TATA/helper/user_preferences.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
 
-import 'package:TATA/main.dart';
 import 'package:TATA/src/pageTransition.dart';
 import 'package:TATA/menu/JasaDesign/DeskripsiPesanan/DeskripsiBanner.dart';
 import 'package:TATA/src/CustomColors.dart';
@@ -152,15 +150,33 @@ class _BannerPackagePageState extends State<JasaDesignBanner>
         isLoading = true;
       });
       
-      print('Creating direct chat with context: $selectedPackage');
+      print('=== [CHAT-DEBUG] Creating direct chat with context ===');
+      print('Selected Package: $selectedPackage');
+      
+      // **TAMBAHAN: Debug context data yang akan dikirim**
+      print('=== [CONTEXT-DEBUG] JasaDesignPoster ===');
+      print('Package ID: ${selectedPackage['id_paket_jasa']}');
+      print('Jasa ID: ${selectedPackage['id_jasa']}');
+      print('Jenis Pesanan: ${selectedPackage['jenis_pesanan']}');
+      print('Title: ${selectedPackage['title']}');
+      print('Price: ${selectedPackage['price']}');
+      print('Full context data: ${jsonEncode(selectedPackage)}');
       
       // Debug URL
       final token = await UserPreferences.getToken();
-      final url = Server.urlLaravel('chat/create-direct').toString();
+      final url = Server.urlLaravel('mobile/chat/create-direct').toString();
       print('API URL: $url');
       print('Token available: ${token != null}');
+      print('Token: ${token?.substring(0, 20)}...');
       
       final result = await ChatService.createDirectChatWithContext(selectedPackage);
+      
+      print('=== [CHAT-DEBUG] API Response ===');
+      print('Full result: $result');
+      print('Status: ${result['status']}');
+      print('Message: ${result['message']}');
+      print('Data: ${result['data']}');
+      print('Is existing chat: ${result['data']?['is_existing']}');
       
       setState(() {
         isLoading = false;
@@ -168,15 +184,24 @@ class _BannerPackagePageState extends State<JasaDesignBanner>
       
       if (result['status'] == 'success') {
         final chatId = result['data']['chat_id'];
-        print('Chat created successfully with ID: $chatId');
+        final isExisting = result['data']['is_existing'] ?? false;
+        
+        print('=== [CHAT-DEBUG] Navigation Info ===');
+        print('Chat ID: $chatId');
+        print('Is existing chat: $isExisting');
+        
+        if (isExisting) {
+          print('Using existing chat room');
+        } else {
+          print('Created new chat room');
+        }
         
         // Navigate to chat detail screen
-        Navigator.pushAndRemoveUntil(
+        Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => ChatDetailScreen(chatId: chatId),
           ),
-          (route) => false,
         );
       } else {
         print('Failed to create chat: ${result['message']}');
@@ -184,6 +209,11 @@ class _BannerPackagePageState extends State<JasaDesignBanner>
           SnackBar(
             content: Text('Gagal membuat chat: ${result['message']}'),
             backgroundColor: Colors.red,
+            duration: Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'Coba Lagi',
+              onPressed: () => _openChatWithContext(),
+            ),
           ),
         );
       }

@@ -33,11 +33,15 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   String? _pesananUuid;
   List<Map<String, dynamic>> _messages = [];
   Map<String, dynamic>? _orderInfo;
+  bool _hasScrolledToBottomOnce = false; // Flag untuk auto scroll hanya sekali
 
   Timer? _refreshTimer;
 
   final StreamController<List<Map<String, dynamic>>> _messagesController = StreamController.broadcast();
 
+  // Tambahkan variable untuk title
+  String _chatTitle = 'Chat dengan Admin';
+  
   @override
   void initState() {
     super.initState();
@@ -146,12 +150,20 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     }
   }
 
+  // Update method _loadOrderInfo untuk trigger _loadChatInfo setelah selesai
   Future<void> _loadOrderInfo() async {
     try {
       final token = await UserPreferences.getToken();
       print('Token yang digunakan: $token');
       if (token == null) {
         print('No token available for order info');
+        // Set orderInfo sebagai map kosong untuk direct chat
+        if (mounted) {
+          setState(() {
+            _orderInfo = {}; // Empty map menandakan tidak ada data pesanan
+          });
+        }
+        await _loadChatInfo(); // Trigger update title
         return;
       }
 
@@ -177,19 +189,74 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           print('Order info loaded successfully: $_orderInfo');
         } else {
           print('Order info API error: ${data['message']}');
+          // Set orderInfo sebagai map kosong untuk menandakan tidak ada data pesanan
+          if (mounted) {
+            setState(() {
+              _orderInfo = {}; // Empty map menandakan tidak ada data pesanan
+            });
+          }
         }
       } else {
         print(
             'Order info HTTP error: ${response.statusCode} - ${response.body}');
+        // Set orderInfo sebagai map kosong untuk menandakan tidak ada data pesanan
+        if (mounted) {
+          setState(() {
+            _orderInfo = {}; // Empty map menandakan tidak ada data pesanan
+          });
+        }
       }
+      
+      // Trigger update title setelah _orderInfo di-set
+      await _loadChatInfo();
+      
     } catch (e) {
       print('Error loading order info: $e');
+      // Set orderInfo sebagai map kosong untuk menandakan tidak ada data pesanan
+      if (mounted) {
+        setState(() {
+          _orderInfo = {}; // Empty map menandakan tidak ada data pesanan
+        });
+      }
+      // Trigger update title bahkan jika error
+      await _loadChatInfo();
     }
   }
 
   void _markMessagesAsRead() {
     if (widget.chatId.isNotEmpty) {
       _chatService.markMessagesAsReadByOrderId(widget.chatId);
+      // Tambahan: Mark pesan admin sebagai sudah dibaca oleh user
+      _markAdminMessagesAsRead();
+    }
+  }
+  
+  // Tambahan fungsi untuk menandai pesan admin sebagai sudah dibaca
+  Future<void> _markAdminMessagesAsRead() async {
+    try {
+      final token = await UserPreferences.getToken();
+      if (token == null) return;
+      
+      final response = await http.post(
+        Server.urlLaravel('mobile/chat/mark-admin-messages-read'),
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': token,
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'chat_uuid': widget.chatId,
+        }),
+      );
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['status'] == 'success') {
+          print('Admin messages marked as read successfully');
+        }
+      }
+    } catch (e) {
+      print('Error marking admin messages as read: $e');
     }
   }
 
@@ -231,11 +298,15 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           setState(() {
             _isLoading = false;
           });
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (_scrollController.hasClients) {
-              _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
-            }
-          });
+          // Auto scroll hanya sekali setelah membuka chat
+          if (!_hasScrolledToBottomOnce) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (_scrollController.hasClients) {
+                _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+                _hasScrolledToBottomOnce = true; // Set flag agar tidak scroll lagi otomatis
+              }
+            });
+          }
         }
         print('=== [TATA-DEBUG] Loaded ${_messages.length} messages successfully ===');
       } else {
@@ -402,6 +473,16 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         if (messageResponse != null && messageResponse['status'] == 'success') {
           print('Image message sent successfully');
           await _loadMessages();
+          // Scroll ke bawah setelah mengirim gambar (web)
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (_scrollController.hasClients) {
+              _scrollController.animateTo(
+                _scrollController.position.maxScrollExtent,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOut,
+              );
+            }
+          });
         } else {
           throw Exception('Gagal mengirim pesan gambar: ${messageResponse?['message'] ?? 'Unknown error'}');
         }
@@ -463,7 +544,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         // Gunakan endpoint sendMessageByPesanan yang sesuai dengan Laravel
         final messageResponse = await _chatService.sendMessageByPesanan(
           _pesananUuid ?? widget.chatId,
-          'Mengirim gambar',
+          'Mengirim Gambar',
           messageType: 'image',
           fileUrl: fileUrl,
         );
@@ -473,6 +554,16 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         if (messageResponse != null && messageResponse['status'] == 'success') {
           print('Image message sent successfully');
           await _loadMessages();
+          // Scroll ke bawah setelah mengirim gambar (mobile)
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (_scrollController.hasClients) {
+              _scrollController.animateTo(
+                _scrollController.position.maxScrollExtent,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOut,
+              );
+            }
+          });
         } else {
           throw Exception('Gagal mengirim pesan gambar: ${messageResponse?['message'] ?? 'Unknown error'}');
         }
@@ -516,6 +607,18 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         if (response != null && response['status'] == 'success') {
           print('Message sent successfully');
           await _loadMessages();
+          // Mark pesan admin sebagai sudah dibaca setelah mengirim pesan baru
+          await _markAdminMessagesAsRead();
+          // Scroll ke bawah setelah mengirim pesan
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (_scrollController.hasClients) {
+              _scrollController.animateTo(
+                _scrollController.position.maxScrollExtent,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOut,
+              );
+            }
+          });
         } else {
           print(
               'Failed to send message: ${response?['message'] ?? 'Unknown error'}');
@@ -543,6 +646,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   }
 
   Widget _buildProductInfoBox() {
+    // Jika _orderInfo adalah null, masih loading
     if (_orderInfo == null) {
       return Container(
         margin: const EdgeInsets.all(12),
@@ -570,6 +674,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           ],
         ),
       );
+    }
+    
+    // Jika _orderInfo adalah map kosong, tidak ada data pesanan (direct chat)
+    if (_orderInfo!.isEmpty) {
+      return SizedBox.shrink(); // Tidak menampilkan apa-apa
     }
 
     return Container(
@@ -787,9 +896,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 const SizedBox(width: 4),
                 if (isFromUser)
                   Icon(
-                    message['is_read'] == true ? Icons.done_all : Icons.done,
+                    _getReadStatusIcon(message),
                     size: 12,
-                    color: Colors.white70,
+                    color: _getReadStatusColor(message),
                   ),
               ],
             ),
@@ -799,11 +908,66 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     );
   }
 
+  // Update method _loadChatInfo untuk handle title yang lebih dinamis
+  Future<void> _loadChatInfo() async {
+    try {
+      print('Loading chat info - _orderInfo: $_orderInfo');
+      
+      // Cek apakah ini chat dari pesanan atau direct chat
+      if (_orderInfo != null && _orderInfo!.isNotEmpty) {
+        // Chat dari pesanan
+        final productType = _orderInfo?['jasa']?['kategori'] ?? 'Produk';
+        if (mounted) {
+          setState(() {
+            _chatTitle = 'Chat - $productType';
+          });
+        }
+        print('Set title to: Chat - $productType');
+      } else {
+        // Direct chat atau chat tanpa pesanan
+        if (mounted) {
+          setState(() {
+            _chatTitle = 'Chat dengan Admin';
+          });
+        }
+        print('Set title to: Chat dengan Admin');
+      }
+    } catch (e) {
+      print('Error loading chat info: $e');
+      // Fallback ke title default
+      if (mounted) {
+        setState(() {
+          _chatTitle = 'Chat dengan Admin';
+        });
+      }
+    }
+  }
+  
+  // Fungsi untuk mendapatkan ikon read status
+  IconData _getReadStatusIcon(Map<String, dynamic> message) {
+    final isRead = message['is_read'];
+    if (isRead == 1 || isRead == true) {
+      return Icons.done_all; // Double check mark - sudah dibaca
+    } else {
+      return Icons.done; // Single check mark - terkirim tapi belum dibaca
+    }
+  }
+  
+  // Fungsi untuk mendapatkan warna read status
+  Color _getReadStatusColor(Map<String, dynamic> message) {
+    final isRead = message['is_read'];
+    if (isRead == 1 || isRead == true) {
+      return Colors.lightBlueAccent; // Biru terang untuk sudah dibaca
+    } else {
+      return Colors.white70; // Putih transparan untuk belum dibaca
+    }
+  }
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Chat dengan Admin',
+        title: Text(_chatTitle, // Gunakan variable yang dinamis
             style: TextStyle(color: CustomColors.whiteColor),
             ),
         leading: IconButton(
@@ -811,7 +975,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             color: CustomColors.whiteColor,
           ),
           onPressed: () {
-            Navigator.pop(context); // kembali ke halaman sebelumnya
+            Navigator.pop(context);
           },
         ),
         backgroundColor: CustomColors.primaryColor,
